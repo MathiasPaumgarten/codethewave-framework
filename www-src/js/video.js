@@ -58,9 +58,9 @@ function Video() {
             // serverPath = "./";
         }
 
-        if(String(document.location.pathname).indexOf("examples") >=1){
-            serverPath = "../";
-        }
+        // if(String(document.location.pathname).indexOf("examples") >=1){
+        //     serverPath = "../";
+        // }
 
 
         SPF.log("serverPath", serverPath);

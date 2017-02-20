@@ -1,0 +1,88 @@
+<!doctype html>
+
+<html class="no-js" lang="">
+
+    <head>
+        <title>Cast</title>
+
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+        <link rel="apple-touch-icon" href="apple-touch-icon.png">
+        <link rel="stylesheet" type="text/css" href="https://cloud.typography.com/7214534/7144972/css/fonts.css" />
+        <link rel="stylesheet" href="../main.css"/>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/detectizr/2.2.0/detectizr.min.js"></script>
+        <script src="../js/pixi.min.js"></script>
+        <script src="../js/TweenMax.min.js"></script>
+
+
+        <script id="fragment-shader" type="x-shader/x-fragment">
+            precision mediump float;
+
+            void main() {
+                gl_FragColor = vec4( 1, 0, 0, 1 );
+            }
+        </script>
+    </head>
+
+    <body>
+
+    <!--[if lt IE 8]>
+
+        <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+
+    <![endif]-->
+
+    <script src="../sp-framework.js"></script>
+
+    <script type="text/javascript">
+
+        var fragmentShader = document.getElementById( "fragment-shader" ).innerText;
+        var background, backgroundColor;
+
+        SPF.set( {
+
+            at: "mid",
+
+            init: function (PIXI, input ) {
+
+                var kaleidoShader = new PIXI.AbstractFilter( "", fragmentShader );
+
+                background = new PIXI.Graphics();
+                background.filters = [ kaleidoShader ];
+                background.drawRect( 0, 0, input.width, input.height );
+
+                input.container.addChild( background );
+            },
+
+            resize: function( PIXI, input ) {
+                background.clear();
+                background.drawRect( 0, 0, input.width, input.height );
+            },
+
+            render: function( PIXI, input ) {}
+
+        } );
+
+
+        SPF.info( {
+            debug: false,
+            title: "Kaleido",
+            tip: "",
+            firstName: "Mathias",
+            lastName: "Paumgarten",
+            email: "mail@mathias-paumgarten.com"
+        } );
+
+        SPF.start();
+
+    </script>
+
+    </body>
+
+</html>
