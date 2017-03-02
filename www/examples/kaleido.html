@@ -1,8 +1,111 @@
 <!doctype html> <html class="no-js" lang><head><title>Cast</title><meta charset="utf-8"><meta http-equiv="x-ua-compatible" content="ie=edge"><meta name="description" content><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="stylesheet" type="text/css" href="https://cloud.typography.com/7214534/7144972/css/fonts.css"><link rel="stylesheet" href="../main.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/detectizr/2.2.0/detectizr.min.js"></script><script src="../js/pixi.min.js"></script><script src="../js/TweenMax.min.js"></script><script id="fragment-shader" type="x-shader/x-fragment">
-            precision mediump float;
+            #define PI 3.141592653589793
+            #define TAU 6.283185307
+
+            varying vec2 vTextureCoord;
+
+            uniform sampler2D image;
+            uniform sampler2D uSampler;
+            uniform vec2 imageSize;
+            uniform vec2 resolution;
+            uniform float maxSize;
+            uniform vec2 color;
+
+            const float radius = 600.0;
+            const float slices = 12.0;
+            const float seperation = 600.0;
+
+            vec2 polarToCartesian( float angle, float r ) {
+                return vec2(
+                    r * cos( angle ),
+                    r * sin( angle )
+                );
+            }
+
+            vec3 drawCircle( vec2 center ) {
+
+                vec2 positionFromCenter = gl_FragCoord.xy - center;
+                float distancePercent = length( positionFromCenter ) / radius;
+
+                distancePercent = min( distancePercent, 1.0 );
+
+                float piece = 1.0 / slices;
+
+                vec2 positionDirection = normalize( positionFromCenter );
+
+                float angle = atan( positionDirection.y, positionDirection.x );
+                float anglePercent = ( 1.0 + ( angle / PI ) ) / 2.0;
+
+                float leftover = mod( anglePercent, piece );
+                float sectionPercent = leftover / piece;
+
+                float index = floor( anglePercent / piece );
+
+                if ( mod( index, 2.0 ) == 0.0 ) {
+                    sectionPercent = 1.0 - sectionPercent;
+                    leftover = piece - leftover;
+                }
+
+                vec2 uv = polarToCartesian( leftover * TAU, distancePercent * radius );
+
+                uv /= vec2( radius, maxSize );
+
+                vec2 triangleBox = vec2( radius, maxSize );
+
+                vec2 scaleVector = triangleBox / imageSize;
+                float scale = max( scaleVector.x, scaleVector.y );
+
+                vec2 scaleBox = imageSize * scale;
+                vec2 startingPoints = scaleBox / 2.0 - triangleBox / 2.0;
+
+                vec2 coord = startingPoints + uv * triangleBox;
+
+                uv = coord / scaleBox;
+
+                return texture2D( uSampler, uv ).rgb;
+            }
+
 
             void main() {
-                gl_FragColor = vec4( 1, 0, 0, 1 );
+
+                vec2 center = resolution / 2.0;
+
+                vec2 upperLeft = center - vec2( seperation );
+                vec2 upperRight = center + vec2( seperation, - seperation );
+                vec2 lowerRight = center + vec2( seperation );
+                vec2 lowerLeft = center + vec2( - seperation, seperation );
+
+                vec2 xy = gl_FragCoord.xy;
+
+                float centerDistance = distance( xy, center );
+                float upperLeftDistance = distance( xy, upperLeft );
+                float upperRightDistance = distance( xy, upperRight );
+                float lowerRightDistance = distance( xy, lowerRight );
+                float lowerLeftDistance = distance( xy, lowerLeft );
+
+                vec2 points[ 5 ];
+                points[ 0 ] = center;
+                points[ 1 ] = upperLeft;
+                points[ 2 ] = upperRight;
+                points[ 3 ] = lowerRight;
+                points[ 4 ] = lowerLeft;
+
+                float distances[ 5 ];
+                distances[ 0 ] = centerDistance;
+                distances[ 1 ] = upperLeftDistance;
+                distances[ 2 ] = upperRightDistance;
+                distances[ 3 ] = lowerRightDistance;
+                distances[ 4 ] = lowerLeftDistance;
+
+                float smallest = max( resolution.x, resolution.y );
+                vec3 pixel;
+
+                for ( int i = 0; i < 5; i++ ) {
+                    if ( distances[ i ] < smallest ) {
+                        smallest = distances[ i ];
+                        gl_FragColor = vec4( drawCircle( points[ i ] ), 1.0 );
+                    }
+                }
             }
         </script></head><body><!--[if lt IE 8]>
 
@@ -10,33 +113,80 @@
 
     <![endif]--><script src="../sp-framework.js"></script><script type="text/javascript">
 
+        var TAU = Math.PI * 2;
+        var PI_HALF = Math.PI * 0.5;
+
         var fragmentShader = document.getElementById( "fragment-shader" ).innerText;
-        var background, backgroundColor;
+        var background;
+        var kaleidoFilter;
+        var side = 2 * 600 * Math.cos( PI_HALF - ( ( TAU / 12 ) / 2 ) );
+
+        var elements = [];
 
         SPF.set( {
 
             at: "mid",
 
-            init: function (PIXI, input ) {
+            load: function(PIXI, input) {
+                return [
+                    input.patterns.botanicorganic2,
+                    input.maskers.botanicorganic2
+                ];
+            },
 
-                var kaleidoShader = new PIXI.AbstractFilter( "", fragmentShader );
+            init: function( PIXI, input ) {
 
                 background = new PIXI.Graphics();
-                background.filters = [ kaleidoShader ];
-                background.drawRect( 0, 0, input.width, input.height );
 
                 input.container.addChild( background );
+
+                var sprite;
+
+                for ( var i = 0; i < 5; i++ ) {
+                    sprite = new PIXI.extras.TilingSprite( input.patterns.botanicorganic2, 1, 1 );
+                    sprite.rotation = Math.PI * Math.random() * 2;
+                    sprite.width = 200;
+                    sprite.height = 200;
+                    sprite.x = Math.random() * 100 + 200;
+                    sprite.y = Math.random() * 100 + 200;
+
+                    input.container.addChild( sprite );
+                }
+
+                kaleidoFilter = new PIXI.AbstractFilter( "", fragmentShader, {
+                    resolution: { type: "vec2", value: { x: window.innerWidth, y: window.innerHeight } },
+                    imageSize: { type: "vec2", value: { x: 1024, y: 512 } },
+                    maxSize: { type: "float", value: side },
+                } );
+
+                input.container.filters = [ kaleidoFilter ];
             },
 
             resize: function( PIXI, input ) {
                 background.clear();
-                background.drawRect( 0, 0, input.width, input.height );
+                background.drawRect( 0, 0, 1024, 512 );
+
+                kaleidoFilter.uniforms.resolution.x = window.innerWidth;
+                kaleidoFilter.uniforms.resolution.y = window.innerHeight;
+
+                input.container.width = input.width;
+                input.container.height = input.height;
             },
 
-            render: function( PIXI, input ) {}
+            render: function( PIXI, input ) {
+                background.clear();
+                background.drawRect( 0, 0, 1024, 512 );
+
+                background.beginFill( 0xff00ff );
+                // background.drawRect( Math.random() * 1024, Math.random() * 512, 100, 100 );
+                background.endFill();
+
+                for ( var i = 0; i < 5; i++ ) {
+                    input.container.children[ i + 1 ].rotation += 0.03;
+                }
+            }
 
         } );
-
 
         SPF.info( {
             debug: false,
