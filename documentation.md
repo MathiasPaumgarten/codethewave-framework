@@ -240,7 +240,7 @@ This function is called everytime your graphics is drawn. This is where you mani
 ```javascript
 SPF.set({
     render: function(PIXI, input) {
-        
+
         // Only rotate tilingSpriteBackMask if frameRate is not poor.
         if(input.frameRate >30){
             tilingSpriteBackMask.rotation += 0.1;
@@ -366,7 +366,7 @@ Inside SPF.info the following properties are available:
 <dl>
   <dt>debug (Boolean)</dt>
   <dd>Valid values are "true" and "false".</dd>
- 
+
   <dt>tip (String)</dt>
   <dd>Add a description on how to interact with your visual.</dd>
 
@@ -594,13 +594,13 @@ The _id_ value can be one of the following:
 <dl>
   <dt>none</dt>
   <dd>There is no video footage.</dd>
-  
+
   <dt>full</dt>
   <dd>The full body of the band is visible.</dd>
-  
+
   <dt>medium</dt>
   <dd>The band is visible from the hips up to the head.</dd>
-  
+
   <dt>close</dt>
   <dd>The band is in a close up.</dd>
 </dl>
