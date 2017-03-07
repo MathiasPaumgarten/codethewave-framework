@@ -27,16 +27,13 @@
 
             varying vec2 vTextureCoord;
 
-            uniform sampler2D image;
             uniform sampler2D uSampler;
             uniform vec2 imageSize;
             uniform vec2 resolution;
             uniform float maxSize;
-            uniform vec2 color;
+            uniform float radius;
 
-            const float radius = 600.0;
-            const float slices = 12.0;
-            const float seperation = 600.0;
+            const float slices = 32.0;
 
             vec2 polarToCartesian( float angle, float r ) {
                 return vec2(
@@ -91,7 +88,14 @@
 
             void main() {
 
+                // if ( any( greaterThan( vTextureCoord, vec2( 1 ) ) ) ) discard;
+
+                // gl_FragColor = texture2D( uSampler, vTextureCoord );
+                // return;
+
                 vec2 center = resolution / 2.0;
+
+                float seperation = radius;
 
                 vec2 upperLeft = center - vec2( seperation );
                 vec2 upperRight = center + vec2( seperation, - seperation );
@@ -149,73 +153,116 @@
         var PI_HALF = Math.PI * 0.5;
 
         var fragmentShader = document.getElementById( "fragment-shader" ).innerText;
-        var background;
+        var background, mask;
         var kaleidoFilter;
-        var side = 2 * 600 * Math.cos( PI_HALF - ( ( TAU / 12 ) / 2 ) );
-
         var elements = [];
+        var graphics;
+
+        function getSide( value ) {
+            return 2 * value * Math.cos( PI_HALF - ( ( TAU / 12 ) / 2 ) );
+        }
+
+
+        function randomItem( array ) {
+            return array[ Math.floor( Math.random() * array.length ) ];
+        }
 
         SPF.set( {
 
-            at: "mid",
+            at: "back",
 
-            load: function(PIXI, input) {
-                return [
-                    input.patterns.botanicorganic2,
-                    input.maskers.botanicorganic2
+            load: function( PIXI, input ) {
+                graphics = [
+                    input.graphics.animaltech,
+                    input.graphics.bbbbird1,
+                    input.graphics.botanicorganic,
+                    input.graphics.handdrawnanimal1,
+                    input.graphics.crazyflower1,
+                    input.graphics.leaf1,
+                    input.graphics.flower1,
+                    input.graphics.stone,
+                    input.graphics.wingwave
                 ];
+
+                return graphics;
             },
 
             init: function( PIXI, input ) {
+                try {
+
+                var holder = new PIXI.Sprite();
 
                 background = new PIXI.Graphics();
+                background.clear();
+                background.beginFill( 0 );
+                background.drawRect( 0, 0, 1024, 512 );
+                background.endFill();
 
-                input.container.addChild( background );
+                holder.addChild( background );
 
-                var sprite;
-
-                for ( var i = 0; i < 5; i++ ) {
-                    sprite = new PIXI.extras.TilingSprite( input.patterns.botanicorganic2, 1, 1 );
+                for ( var i = 0; i < 15; i++ ) {
+                    var sprite = new PIXI.extras.TilingSprite( randomItem( graphics ), 1, 1 );
                     sprite.rotation = Math.PI * Math.random() * 2;
-                    sprite.width = 200;
-                    sprite.height = 200;
-                    sprite.x = Math.random() * 100 + 200;
-                    sprite.y = Math.random() * 100 + 200;
+                    sprite.width = 500;
+                    sprite.height = 500;
+                    sprite.anchor.set( 0.5, 0.5 )
+                    sprite.x = Math.random() * window.innerWidth;
+                    sprite.y = Math.random() * window.innerHeight;
+                    sprite.rotationSpeed = -0.03 + Math.random() * 0.06;
 
-                    input.container.addChild( sprite );
+                    holder.addChild( sprite );
+
+                    elements.push( sprite );
                 }
 
                 kaleidoFilter = new PIXI.AbstractFilter( "", fragmentShader, {
                     resolution: { type: "vec2", value: { x: window.innerWidth, y: window.innerHeight } },
-                    imageSize: { type: "vec2", value: { x: 1024, y: 512 } },
-                    maxSize: { type: "float", value: side },
+                    imageSize: { type: "vec2", value: { x: input.width, y: input.innerHeight } },
+                    maxSize: { type: "float", value: getSide( window.innerWidth ) },
+                    radius: { type: "float", value: window.innerWidth }
                 } );
 
+                mask = new PIXI.Graphics();
+                mask.beginFill( 0 );
+                mask.drawRect( 0, 0, input.width, input.height );
+                mask.endFill();
+
+                holder.mask = mask;
+
+                input.container.addChild( holder );
                 input.container.filters = [ kaleidoFilter ];
+
+                } catch( e ) {
+                    console.error( e )
+                }
             },
 
             resize: function( PIXI, input ) {
                 background.clear();
-                background.drawRect( 0, 0, 1024, 512 );
+                background.beginFill( 0 );
+                background.drawRect( 0, 0, input.width, input.height );
+                background.endFill();
+
+                mask.clear();
+                mask.beginFill( 0 );
+                mask.drawRect( 0, 0, input.width, input.height );
+                mask.endFill();
 
                 kaleidoFilter.uniforms.resolution.x = window.innerWidth;
                 kaleidoFilter.uniforms.resolution.y = window.innerHeight;
 
-                input.container.width = input.width;
-                input.container.height = input.height;
+                kaleidoFilter.uniforms.imageSize.x = window.innerWidth;
+                kaleidoFilter.uniforms.imageSize.y = window.innerHeight;
+
+                kaleidoFilter.uniforms.radius = window.innerWidth;
+                kaleidoFilter.uniforms.maxSize = getSide( window.innerWidth );
             },
 
             render: function( PIXI, input ) {
-                background.clear();
-                background.drawRect( 0, 0, 1024, 512 );
 
-                background.beginFill( 0xff00ff );
-                // background.drawRect( Math.random() * 1024, Math.random() * 512, 100, 100 );
-                background.endFill();
-
-                for ( var i = 0; i < 5; i++ ) {
-                    input.container.children[ i + 1 ].rotation += 0.03;
-                }
+                elements.forEach( function( sprite ) {
+                    sprite.rotation += sprite.rotationSpeed;
+                } );
             }
 
         } );
