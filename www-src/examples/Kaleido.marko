@@ -21,7 +21,11 @@
         <script src="../js/TweenMax.min.js"></script>
 
 
-        <script id="fragment-shader" type="x-shader/x-fragment">
+        <script id="kaleido-shader" type="x-shader/x-fragment">
+            #ifdef GL_OES_standard_derivatives
+            #extension GL_OES_standard_derivatives : enable
+            #endif
+
             #define PI 3.141592653589793
             #define TAU 6.283185307
 
@@ -31,8 +35,38 @@
             uniform vec2 resolution;
             uniform float maxSize;
             uniform float radius;
+            uniform float hyper;
 
             const float slices = 32.0;
+            const float frequency = 40.0;
+
+            const vec4 white = vec4( 1 );
+            const vec4 black = vec4( 0, 0, 0, 1 );
+
+            float aastep( float threshold, float value ) {
+                #ifdef GL_OES_standard_derivatives
+                    float afwidth = 0.7 * length( vec2( dFdx( value ), dFdy( value ) ) );
+                #else
+                    float afwidth = frequency * ( 1.0 / 200.0 ) / cos( 0.0 );
+                #endif
+
+                return smoothstep( threshold - afwidth, threshold + afwidth, value );
+            }
+
+            vec4 halftone( vec4 color ) {
+                vec2 st2 = mat2( 0.707, -0.707, 0.707, 0.707 ) * vTextureCoord;
+                vec2 nearest = 2.0 * fract( frequency * st2 ) - 1.0;
+                float dist = length( nearest );
+                float radius = sqrt( 1.0 - color.g );
+
+                return mix( black, white, aastep( radius, dist ) );
+            }
+
+            vec4 grayscale( vec4 color ) {
+                float gray = dot( color.rgb, vec3( 0.299, 0.587, 0.114 ) );
+
+                return vec4( gray, gray, gray, color.a );
+            }
 
             vec2 polarToCartesian( float angle, float r ) {
                 return vec2(
@@ -124,9 +158,36 @@
                 for ( int i = 0; i < 5; i++ ) {
                     if ( distances[ i ] < smallest ) {
                         smallest = distances[ i ];
-                        gl_FragColor = vec4( drawCircle( points[ i ] ), 1.0 );
+
+                        vec4 color = vec4( drawCircle( points[ i ] ), 1.0 );
+
+                        gl_FragColor = mix(
+                            color,
+                            halftone( color ),
+                            hyper
+                        );
                     }
                 }
+            }
+        </script>
+
+        <script id="stripe-shader" type="x-shader/x-fragment">
+            const vec4 black = vec4( 0, 0, 0, 1 );
+            const vec4 white = vec4( 1 );
+
+            void main() {
+
+                float value = mod( gl_FragCoord.y + gl_FragCoord.x / 20.0,  20.0 );
+
+                float lowerEdge = ( 1.0 - smoothstep( 0.0, 1.0, value ) ) * ( 1.0 - step( 1.0, value ) );
+                float middleEdge = smoothstep( 9.0, 11.0, value );
+
+                gl_FragColor =
+                    mix(
+                        black,
+                        white,
+                        lowerEdge + middleEdge
+                    );
             }
         </script>
     </head>
@@ -148,9 +209,12 @@
         var PI_HALF = Math.PI * 0.5;
 
         // Variables
-        var fragmentShader = document.getElementById( "fragment-shader" ).innerText;
+        var fragmentShader = document.getElementById( "kaleido-shader" ).innerText;
+        var stripeShader = document.getElementById( "stripe-shader" ).innerText;
+        var isMouseDown = false;
         var background, mask;
-        var kaleidoFilter;
+        var stripeLayer;
+        var kaleidoFilter, stripeFilter;
         var elements = [];
         var graphics;
         var radiusTarget, radius;
@@ -198,7 +262,7 @@
 
                 holder.addChild( background );
 
-                for ( var i = 0; i < 15; i++ ) {
+                for ( var i = 0; i < 5; i++ ) {
                     var sprite = new PIXI.extras.TilingSprite( randomItem( graphics ), 1, 1 );
                     sprite.rotation = Math.PI * Math.random() * 2;
                     sprite.width = 500;
@@ -218,7 +282,8 @@
                 kaleidoFilter = new PIXI.AbstractFilter( "", fragmentShader, {
                     resolution: { type: "vec2", value: { x: window.innerWidth, y: window.innerHeight } },
                     maxSize: { type: "float", value: getSide( radiusTarget ) },
-                    radius: { type: "float", value: radiusTarget }
+                    radius: { type: "float", value: radiusTarget },
+                    hyper: { type: "float", value: 0 }
                 } );
 
                 mask = new PIXI.Graphics();
@@ -258,15 +323,14 @@
                     sprite.rotation += sprite.rotationSpeed;
                 } );
 
-                if ( input.beat ) {
-                    radius = radiusTarget + 300;
-                }
+                if ( input.beat ) radius = radiusTarget + 300;
 
                 radius -= 5;
                 radius = Math.max( radiusTarget, radius );
 
                 kaleidoFilter.uniforms.radius = radius;
                 kaleidoFilter.uniforms.maxSize = getSide( radius );
+                kaleidoFilter.uniforms.hyper = isMouseDown ? 1 : 0;
 
                 } catch( e ) {
                     console.warn( e );
@@ -275,10 +339,48 @@
 
         } );
 
+        // Video
+        SPF.set( {
+
+            at: "mid",
+
+            init: function( PIXI, input ) {
+                stripeFilter = new PIXI.AbstractFilter( "", stripeShader, {} );
+
+                stripeLayer = new PIXI.Graphics();
+                stripeLayer.filters = [ stripeFilter ];
+
+                input.container.addChild( stripeLayer );
+            },
+
+            mouseDownTouchStart: function( PIXI, input ) {
+                stripeLayer.clear();
+                stripeLayer.beginFill( 0x00ff00 );
+                stripeLayer.drawRect( 0, 0, input.width, input.height );
+                stripeLayer.endFill();
+
+                SPF.midgroundMask( true );
+
+                isMouseDown = true;
+            },
+
+            mouseUpTouchEnd: function() {
+                SPF.midgroundMask( false );
+
+                stripeLayer.clear();
+
+                isMouseDown = false;
+            },
+
+            render: function() {}
+
+        } );
+
+
         SPF.info( {
             debug: false,
             title: "Kaleido",
-            tip: "",
+            tip: "Press or hold mouse down for crazy mode",
             firstName: "Mathias",
             lastName: "Paumgarten",
             email: "mail@mathias-paumgarten.com"
